@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: #ffffff;
+            color: #37352f;
+            padding: 40px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #37352f;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+            margin: 24px 0;
+            padding: 20px;
+            background: #f7f6f3;
+            border-radius: 6px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #787774;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #37352f;
+        }
+
+        .tracker-grid {
+            margin-top: 32px;
+            overflow-x: auto;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+
+        th {
+            font-size: 12px;
+            font-weight: 500;
+            color: #787774;
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9e9e7;
+        }
+
+        .day-header {
+            text-align: center !important;
+            font-size: 11px;
+            min-width: 50px;
+            transition: all 0.2s;
+            padding: 8px 6px !important;
+        }
+
+        .day-header div:first-child {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .day-header:hover {
+            background: #f7f6f3 !important;
+            transform: scale(1.02);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f7f6f3;
+        }
+
+        .habit-name {
+            font-weight: 500;
+            color: #37352f;
+            font-size: 14px;
+        }
+
+        .day-cell {
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-radius: 4px;
+            min-width: 50px;
+        }
+
+        .day-cell:hover {
+            background: #f7f6f3;
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #e9e9e7;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: #ffffff;
+        }
+
+        .checkbox.checked {
+            background: #0f7b6c;
+            border-color: #0f7b6c;
+            color: white;
+        }
+
+        .checkbox:hover {
+            border-color: #0f7b6c;
+            transform: scale(1.05);
+        }
+
+        .week-separator {
+            height: 8px;
+        }
+
+        .weekend-separator {
+            width: 16px;
+            background: transparent;
+            padding: 0 !important;
+            border-right: 2px solid #e9e9e7;
+        }
+
+        .controls {
+            margin: 24px 0;
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #e9e9e7;
+            border-radius: 6px;
+            background: white;
+            color: #37352f;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #f7f6f3;
+            border-color: #d3d1cb;
+        }
+
+        .reset-btn {
+            background: #eb5757;
+            color: white;
+            border-color: #eb5757;
+        }
+
+        .reset-btn:hover {
+            background: #d63939;
+            border-color: #d63939;
+        }
+
+        .month-label {
+            font-size: 16px;
+            color: #787774;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .month-tabs {
+            display: flex;
+            gap: 8px;
+            margin: 24px 0 16px 0;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e9e9e7;
+            padding-bottom: 8px;
+        }
+
+        .month-tab {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            background: transparent;
+            color: #787774;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+        }
+
+        .month-tab:hover {
+            background: #f7f6f3;
+            color: #37352f;
+        }
+
+        .month-tab.active {
+            color: #0f7b6c;
+            background: #f7f6f3;
+            border-bottom-color: #0f7b6c;
+        }
+
+        .legend {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f7f6f3;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #787774;
+        }
+
+        /* GitHub-style Heatmap */
+        .year-heatmap {
+            margin: 32px 0;
+            padding: 24px;
+            background: #f7f6f3;
+            border-radius: 8px;
+        }
+
+        .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .heatmap-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #37352f;
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #787774;
+        }
+
+        .legend-square {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-rows: repeat(5, 1fr);
+            grid-auto-flow: column;
+            gap: 3px;
+            overflow-x: auto;
+            padding: 8px 0;
+        }
+
+        .heatmap-day {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .heatmap-day:hover {
+            transform: scale(1.3);
+            outline: 2px solid #37352f;
+        }
+
+        .heatmap-day.day-off {
+            background: #666 !important;
+            position: relative;
+        }
+
+        .heatmap-day.day-off::after {
+            content: '×';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .level-0 {
+            background: #ebedf0;
+        }
+
+        .level-1 {
+            background: #9be9a8;
+        }
+
+        .level-2 {
+            background: #40c463;
+        }
+
+        .level-3 {
+            background: #30a14e;
+        }
+
+        .heatmap-months {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            color: #787774;
+        }
+
+        .heatmap-weekdays {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-size: 10px;
+            color: #787774;
+            margin-right: 8px;
+        }
+
+        .heatmap-container {
+            display: flex;
+        }
+
+        .heatmap-weekday {
+            height: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: #37352f;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Habit Tracker</h1>
+        
+        <div class="year-heatmap">
+            <div class="heatmap-header">
+                <h2>Aperçu annuel 2026</h2>
+                <div class="heatmap-legend">
+                    <span>Moins</span>
+                    <div class="legend-square level-0"></div>
+                    <div class="legend-square level-1"></div>
+                    <div class="legend-square level-2"></div>
+                    <div class="legend-square level-3"></div>
+                    <span>Plus</span>
+                </div>
+            </div>
+            <div id="yearHeatmap" class="heatmap-grid"></div>
+        </div>
+        
+        <div class="month-tabs">
+            <button class="month-tab" data-month="1">Février</button>
+            <button class="month-tab" data-month="2">Mars</button>
+            <button class="month-tab" data-month="3">Avril</button>
+            <button class="month-tab" data-month="4">Mai</button>
+            <button class="month-tab" data-month="5">Juin</button>
+            <button class="month-tab" data-month="6">Juillet</button>
+            <button class="month-tab" data-month="7">Août</button>
+            <button class="month-tab" data-month="8">Septembre</button>
+            <button class="month-tab" data-month="9">Octobre</button>
+            <button class="month-tab" data-month="10">Novembre</button>
+            <button class="month-tab" data-month="11">Décembre</button>
+        </div>
+
+        <div class="month-label" id="monthLabel">Février 2026</div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">Streak actuel</div>
+                <div class="stat-value" id="currentStreak">🔥 0 jours</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Taux de complétion</div>
+                <div class="stat-value" id="completionRate">0%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Meilleur streak</div>
+                <div class="stat-value" id="bestStreak">0 jours</div>
+            </div>
+        </div>
+
+        <div class="controls" style="display: none;">
+        </div>
+
+        <div class="tracker-grid">
+            <table id="trackerTable">
+                <thead>
+                    <tr>
+                        <th>Habitude</th>
+                    </tr>
+                </thead>
+                <tbody id="trackerBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="legend">
+            💡 <strong>Astuce :</strong> Cliquez sur une case pour cocher/décocher une habitude. <strong>Cliquez sur un en-tête de date (ex: "Mar 4 fév")</strong> pour marquer/démarquer le jour comme OFF. Vos données sont sauvegardées automatiquement.
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const habits = [
+            { id: 'early_wake', name: 'Early wake up' },
+            { id: 'run', name: 'Run' },
+            { id: 'business', name: 'Business work' }
+        ];
+
+        let currentMonth = 1; // February = 1 (0-indexed months)
+        const weeksToShow = 8; // Show 8 weeks
+        
+        let habitData = {};
+        let daysOff = {}; // Track days off
+
+        const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                           'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+        // Load data from localStorage
+        function loadData() {
+            const saved = localStorage.getItem('habitTrackerData');
+            if (saved) {
+                habitData = JSON.parse(saved);
+            }
+            const savedDaysOff = localStorage.getItem('habitTrackerDaysOff');
+            if (savedDaysOff) {
+                daysOff = JSON.parse(savedDaysOff);
+            }
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('habitTrackerData', JSON.stringify(habitData));
+            localStorage.setItem('habitTrackerDaysOff', JSON.stringify(daysOff));
+            updateStats();
+            renderYearHeatmap();
+        }
+
+        // Generate weekdays only (Monday to Friday)
+        function generateWeekdays() {
+            const days = [];
+            
+            // Start from February 9, 2026 (which should be a Monday)
+            let currentDate = new Date(2026, 1, 9); // Feb 9, 2026
+            
+            const monthEnd = new Date(2026, currentMonth + 1, 0); // Last day of current month
+            
+            // If we're viewing a month before February, start from the first Monday of that month
+            if (currentMonth < 1) {
+                currentDate = new Date(2026, currentMonth, 1);
+                while (currentDate.getDay() !== 1) {
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+            // If we're viewing a month after February, start from the first Monday of that month
+            else if (currentMonth > 1) {
+                currentDate = new Date(2026, currentMonth, 1);
+                while (currentDate.getDay() !== 1) {
+                    if (currentDate.getDate() === 1 && currentDate.getDay() > 1) {
+                        currentDate.setDate(currentDate.getDate() - (currentDate.getDay() - 1));
+                    } else {
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                }
+            }
+            
+            // Generate weekdays for the entire month + a bit extra to fill weeks
+            while (currentDate <= monthEnd || days.length < 20) {
+                if (currentDate.getDay() >= 1 && currentDate.getDay() <= 5) { // Monday to Friday
+                    days.push(new Date(currentDate));
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+                
+                // Stop if we've gone too far past the month
+                if (currentDate > monthEnd && currentDate.getDay() === 1) {
+                    break;
+                }
+            }
+            
+            return days;
+        }
+
+        // Switch to a different month
+        function switchMonth(month) {
+            currentMonth = month;
+            document.getElementById('monthLabel').textContent = monthNames[currentMonth] + ' 2026';
+            
+            // Update active tab
+            document.querySelectorAll('.month-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (parseInt(tab.dataset.month) === month) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            renderTracker();
+            updateStats();
+        }
+
+        // Format date as YYYY-MM-DD
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Format date for display (just "9 fév")
+        function formatDisplayDate(date) {
+            const day = date.getDate();
+            const monthAbbr = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
+            return `${day} ${monthAbbr[date.getMonth()]}`;
+        }
+
+        // Get day name (short)
+        function getDayName(date) {
+            const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+            return days[date.getDay()];
+        }
+
+        // Toggle habit
+        function toggleHabit(habitId, dateStr) {
+            if (!habitData[habitId]) {
+                habitData[habitId] = {};
+            }
+            habitData[habitId][dateStr] = !habitData[habitId][dateStr];
+            saveData();
+            renderTracker();
+        }
+
+        // Check if habit is checked
+        function isChecked(habitId, dateStr) {
+            return habitData[habitId] && habitData[habitId][dateStr];
+        }
+
+        // Check if day is marked as off
+        function isDayOff(dateStr) {
+            return daysOff[dateStr] === true;
+        }
+
+        // Toggle day off
+        function toggleDayOff(dateStr) {
+            daysOff[dateStr] = !daysOff[dateStr];
+            if (!daysOff[dateStr]) {
+                delete daysOff[dateStr];
+            }
+            saveData();
+            renderTracker();
+        }
+
+        // Calculate completion level for a day (0-3)
+        function getDayCompletionLevel(dateStr) {
+            if (isDayOff(dateStr)) {
+                return -1; // Special value for day off
+            }
+            
+            let completed = 0;
+            habits.forEach(habit => {
+                if (isChecked(habit.id, dateStr)) {
+                    completed++;
+                }
+            });
+            
+            if (completed === 0) return 0;
+            if (completed === 1) return 1;
+            if (completed === 2) return 2;
+            return 3; // All 3 habits completed
+        }
+
+        // Render year heatmap (GitHub style)
+        function renderYearHeatmap() {
+            const heatmapDiv = document.getElementById('yearHeatmap');
+            heatmapDiv.innerHTML = '';
+            
+            // Generate all weekdays for 2026
+            const allDays = [];
+            const startYear = new Date(2026, 0, 1); // January 1, 2026
+            const endYear = new Date(2026, 11, 31); // December 31, 2026
+            
+            let currentDate = new Date(startYear);
+            
+            // Find first Monday (or start from first day if needed)
+            while (currentDate.getDay() !== 1 && currentDate <= endYear) {
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            // Generate all weekdays
+            while (currentDate <= endYear) {
+                if (currentDate.getDay() >= 1 && currentDate.getDay() <= 5) { // Monday to Friday
+                    allDays.push(new Date(currentDate));
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            // Create grid
+            allDays.forEach(date => {
+                const dateStr = formatDate(date);
+                const level = getDayCompletionLevel(dateStr);
+                
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'heatmap-day';
+                
+                if (level === -1) {
+                    dayDiv.classList.add('day-off');
+                } else {
+                    dayDiv.classList.add(`level-${level}`);
+                }
+                
+                // Tooltip on hover
+                dayDiv.title = `${formatDisplayDate(date)}: ${level === -1 ? 'Jour OFF' : level + '/3 habitudes'}`;
+                
+                dayDiv.addEventListener('click', () => {
+                    // Jump to this day's month
+                    switchMonth(date.getMonth());
+                });
+                
+                heatmapDiv.appendChild(dayDiv);
+            });
+        }
+
+        // Render the tracker
+        function renderTracker() {
+            const weekdays = generateWeekdays();
+            const table = document.getElementById('trackerTable');
+            const thead = table.querySelector('thead tr');
+            const tbody = document.getElementById('trackerBody');
+            
+            // Clear existing content
+            thead.innerHTML = '<th>Habitude</th>';
+            tbody.innerHTML = '';
+            
+            // Add date headers
+            weekdays.forEach((date, index) => {
+                const th = document.createElement('th');
+                th.className = 'day-header';
+                const dateStr = formatDate(date);
+                const isOff = isDayOff(dateStr);
+                
+                th.innerHTML = `<div>${getDayName(date)}</div><div>${formatDisplayDate(date)}</div>`;
+                th.style.cursor = 'pointer';
+                th.style.userSelect = 'none';
+                
+                if (isOff) {
+                    th.style.background = '#e9e9e7';
+                    th.style.color = '#999';
+                    th.style.textDecoration = 'line-through';
+                }
+                
+                // Click on header to toggle day off
+                th.addEventListener('click', () => {
+                    toggleDayOff(dateStr);
+                });
+                
+                th.title = isOff ? 'Cliquer pour réactiver ce jour' : 'Cliquer pour marquer comme jour OFF';
+                
+                thead.appendChild(th);
+                
+                // Add weekend separator after Friday (every 5 days)
+                if ((index + 1) % 5 === 0 && index < weekdays.length - 1) {
+                    const separator = document.createElement('th');
+                    separator.className = 'weekend-separator';
+                    thead.appendChild(separator);
+                }
+            });
+            
+            // Add habit rows
+            habits.forEach(habit => {
+                const tr = document.createElement('tr');
+                
+                // Habit name cell
+                const nameTd = document.createElement('td');
+                nameTd.className = 'habit-name';
+                nameTd.textContent = habit.name;
+                tr.appendChild(nameTd);
+                
+                // Day cells
+                weekdays.forEach((date, index) => {
+                    const td = document.createElement('td');
+                    td.className = 'day-cell';
+                    
+                    const dateStr = formatDate(date);
+                    
+                    // Check if day is marked as OFF
+                    if (isDayOff(dateStr)) {
+                        td.style.opacity = '0.3';
+                        td.style.pointerEvents = 'none';
+                        const offLabel = document.createElement('div');
+                        offLabel.textContent = 'OFF';
+                        offLabel.style.fontSize = '10px';
+                        offLabel.style.color = '#999';
+                        td.appendChild(offLabel);
+                    } else {
+                        const checkbox = document.createElement('div');
+                        checkbox.className = 'checkbox';
+                        if (isChecked(habit.id, dateStr)) {
+                            checkbox.classList.add('checked');
+                            checkbox.textContent = '✓';
+                        }
+                        
+                        checkbox.onclick = () => toggleHabit(habit.id, dateStr);
+                        td.appendChild(checkbox);
+                    }
+                    
+                    tr.appendChild(td);
+                    
+                    // Add weekend separator after Friday
+                    if ((index + 1) % 5 === 0 && index < weekdays.length - 1) {
+                        const separator = document.createElement('td');
+                        separator.className = 'weekend-separator';
+                        tr.appendChild(separator);
+                    }
+                });
+                
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Calculate stats
+        function updateStats() {
+            const weekdays = generateWeekdays();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Filter to only past and present days, excluding days off
+            const relevantDays = weekdays.filter(date => {
+                const dateStr = formatDate(date);
+                return date <= today && !isDayOff(dateStr);
+            });
+            
+            let totalPossible = 0;
+            let totalCompleted = 0;
+            let currentStreak = 0;
+            let bestStreak = 0;
+            let tempStreak = 0;
+            
+            // Calculate completion rate
+            relevantDays.forEach(date => {
+                const dateStr = formatDate(date);
+                let dayComplete = true;
+                
+                habits.forEach(habit => {
+                    totalPossible++;
+                    if (isChecked(habit.id, dateStr)) {
+                        totalCompleted++;
+                    } else {
+                        dayComplete = false;
+                    }
+                });
+                
+                // Calculate streak (all habits completed for the day)
+                if (dayComplete) {
+                    tempStreak++;
+                    if (tempStreak > bestStreak) {
+                        bestStreak = tempStreak;
+                    }
+                } else {
+                    tempStreak = 0;
+                }
+            });
+            
+            // Current streak is the temp streak if it extends to today
+            const todayStr = formatDate(today);
+            let todayComplete = true;
+            if (!isDayOff(todayStr)) {
+                habits.forEach(habit => {
+                    if (!isChecked(habit.id, todayStr)) {
+                        todayComplete = false;
+                    }
+                });
+            }
+            
+            if (todayComplete || relevantDays.length === 0) {
+                currentStreak = tempStreak;
+            }
+            
+            const completionRate = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
+            
+            document.getElementById('currentStreak').textContent = currentStreak > 0 ? `🔥 ${currentStreak} jours` : '0 jours';
+            document.getElementById('completionRate').textContent = `${completionRate}%`;
+            document.getElementById('bestStreak').textContent = `${bestStreak} jours`;
+        }
+
+        // Initialize
+        loadData();
+        
+        // Set up month tab listeners
+        document.querySelectorAll('.month-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                switchMonth(parseInt(tab.dataset.month));
+            });
+        });
+        
+        // Set February as active by default
+        switchMonth(1);
+        
+        // Render year heatmap
+        renderYearHeatmap();
+    </script>
+</body>
+</html>
