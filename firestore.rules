@@ -1,0 +1,247 @@
+rules_version = '2';
+// Prototype rules for the habit tracker. Review them before a wider rollout.
+// Assumed data model:
+// users/{uid}
+//   displayName: string 1..80, no "@"
+//   visibility: "private"
+//   createdAt: timestamp (immutable)
+//   activeHabitIds: list <= 12
+// users/{uid}/habits/{habitId}
+//   name, position, activeFrom, archivedOn, createdAt
+// users/{uid}/entries/{YYYY-MM-DD}
+//   habits: map <= 12, dayOff: bool
+// users/{uid}/memberships/{challengeId}
+//   role: owner|member, joinedAt: timestamp
+// challenges/{challengeId}
+//   name, ownerId, startDate, endDate, weekdaysOnly, createdAt, currentInviteId
+// challenges/{challengeId}/members/{uid}
+//   owner: role, joinedAt
+//   member: role, joinedAt, inviteId
+// challenges/{challengeId}/invites/{inviteId}
+//   createdBy, expiresAt, revoked
+// challenges/{challengeId}/summaries/{uid}
+//   displayName, completionRate, currentStreak, perfectDays, eligibleDays, updatedAt, days
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDateKey(value) {
+      return value is string && value.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+    function isIntInRange(value, minValue, maxValue) {
+      return value is int && value >= minValue && value <= maxValue;
+    }
+    function isSafeName(value) {
+      return value is string && value.size() >= 1 && value.size() <= 80 && !value.matches('.*@.*');
+    }
+    function isMember(challengeId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/challenges/$(challengeId)/members/$(request.auth.uid));
+    }
+    function isChallengeOwner(challengeId) {
+      return isAuthenticated()
+        && getAfter(/databases/$(database)/documents/challenges/$(challengeId)).data.ownerId == request.auth.uid;
+    }
+    function activeIds(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.activeHabitIds;
+    }
+    function activeIdsAfter(userId) {
+      return getAfter(/databases/$(database)/documents/users/$(userId)).data.activeHabitIds;
+    }
+    function isValidUser(data) {
+      return data.keys().hasOnly(['displayName', 'visibility', 'createdAt', 'activeHabitIds'])
+        && isSafeName(data.displayName)
+        && data.visibility == 'private'
+        && data.createdAt is timestamp
+        && data.activeHabitIds is list
+        && data.activeHabitIds.size() <= 12;
+    }
+    function isValidHabit(data) {
+      return data.keys().hasOnly(['name', 'position', 'activeFrom', 'archivedOn', 'createdAt'])
+        && isSafeName(data.name)
+        && isIntInRange(data.position, 0, 1000)
+        && isDateKey(data.activeFrom)
+        && (data.archivedOn == null || (isDateKey(data.archivedOn) && data.archivedOn >= data.activeFrom))
+        && data.createdAt is timestamp;
+    }
+    function isValidEntry(data) {
+      return data.keys().hasOnly(['habits', 'dayOff'])
+        && data.dayOff is bool
+        && data.habits is map
+        && data.habits.size() <= 12;
+    }
+    function isValidChallenge(data) {
+      return data.keys().hasOnly(['name', 'ownerId', 'startDate', 'endDate', 'weekdaysOnly', 'createdAt', 'currentInviteId'])
+        && isSafeName(data.name)
+        && data.ownerId is string
+        && isDateKey(data.startDate)
+        && isDateKey(data.endDate)
+        && data.endDate >= data.startDate
+        && data.weekdaysOnly == true
+        && data.createdAt is timestamp
+        && data.currentInviteId is string
+        && data.currentInviteId.size() >= 16
+        && data.currentInviteId.size() <= 128;
+    }
+    function isValidSummary(data) {
+      return data.keys().hasOnly(['displayName', 'completionRate', 'currentStreak', 'perfectDays', 'eligibleDays', 'updatedAt', 'days'])
+        && isSafeName(data.displayName)
+        && data.completionRate is number
+        && data.completionRate >= 0
+        && data.completionRate <= 1
+        && isIntInRange(data.currentStreak, 0, 366)
+        && isIntInRange(data.perfectDays, 0, 366)
+        && isIntInRange(data.eligibleDays, 0, 366)
+        && data.updatedAt is timestamp
+        && data.days is map
+        && data.days.size() <= 400;
+    }
+    function isValidInvite(data) {
+      return data.keys().hasOnly(['createdBy', 'expiresAt', 'revoked'])
+        && data.createdBy == request.auth.uid
+        && (data.expiresAt == null || data.expiresAt is timestamp)
+        && data.revoked is bool;
+    }
+    function inviteAllowsJoin(challengeId, inviteId) {
+      let path = /databases/$(database)/documents/challenges/$(challengeId)/invites/$(inviteId);
+      return inviteId is string
+        && exists(path)
+        && get(path).data.revoked == false
+        && (get(path).data.expiresAt == null || get(path).data.expiresAt > request.time);
+    }
+    function habitIdentityUnchanged() {
+      return request.resource.data.activeFrom == resource.data.activeFrom
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+    function activeListUnchanged(userId) {
+      return activeIdsAfter(userId).size() == activeIds(userId).size()
+        && activeIdsAfter(userId).hasAll(activeIds(userId));
+    }
+    function activeListAdded(userId, habitId) {
+      return activeIdsAfter(userId).size() == activeIds(userId).size() + 1
+        && activeIdsAfter(userId).size() <= 12
+        && activeIdsAfter(userId).hasAll(activeIds(userId))
+        && activeIdsAfter(userId).hasAny([habitId]);
+    }
+    function activeListRemoved(userId, habitId) {
+      return activeIds(userId).size() == activeIdsAfter(userId).size() + 1
+        && activeIds(userId).hasAll(activeIdsAfter(userId))
+        && activeIds(userId).hasAny([habitId])
+        && !activeIdsAfter(userId).hasAny([habitId]);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidUser(request.resource.data)
+        && request.resource.data.activeHabitIds.size() == 0;
+      allow update: if isOwner(userId)
+        && isValidUser(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.visibility == resource.data.visibility;
+      allow delete: if false;
+
+      match /habits/{habitId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidHabit(request.resource.data)
+          && request.resource.data.archivedOn == null
+          && activeListAdded(userId, habitId);
+        allow update: if isOwner(userId)
+          && isValidHabit(request.resource.data)
+          && habitIdentityUnchanged()
+          && (
+            (request.resource.data.archivedOn == resource.data.archivedOn && activeListUnchanged(userId))
+            || (resource.data.archivedOn == null
+              && request.resource.data.archivedOn != null
+              && activeListRemoved(userId, habitId))
+          );
+        allow delete: if false;
+      }
+
+      match /entries/{date} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isDateKey(date)
+          && isValidEntry(request.resource.data);
+        allow delete: if false;
+      }
+
+      match /memberships/{challengeId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['role', 'joinedAt'])
+          && request.resource.data.role in ['owner', 'member']
+          && request.resource.data.joinedAt is timestamp
+          && existsAfter(/databases/$(database)/documents/challenges/$(challengeId)/members/$(userId))
+          && getAfter(/databases/$(database)/documents/challenges/$(challengeId)/members/$(userId)).data.role == request.resource.data.role;
+        allow update, delete: if false;
+      }
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isMember(challengeId);
+      allow create: if isAuthenticated()
+        && isValidChallenge(request.resource.data)
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isChallengeOwner(challengeId)
+        && isValidChallenge(request.resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.startDate == resource.data.startDate
+        && request.resource.data.endDate == resource.data.endDate
+        && request.resource.data.weekdaysOnly == resource.data.weekdaysOnly
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentInviteId'])
+        && existsAfter(/databases/$(database)/documents/challenges/$(challengeId)/invites/$(request.resource.data.currentInviteId))
+        && getAfter(/databases/$(database)/documents/challenges/$(challengeId)/invites/$(request.resource.data.currentInviteId)).data.revoked == false;
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isMember(challengeId);
+        allow create: if isOwner(memberId) && (
+          (
+            request.resource.data.keys().hasOnly(['role', 'joinedAt'])
+            && request.resource.data.role == 'owner'
+            && request.resource.data.joinedAt is timestamp
+            && getAfter(/databases/$(database)/documents/challenges/$(challengeId)).data.ownerId == request.auth.uid
+          ) || (
+            request.resource.data.keys().hasOnly(['role', 'joinedAt', 'inviteId'])
+            && request.resource.data.role == 'member'
+            && request.resource.data.joinedAt is timestamp
+            && inviteAllowsJoin(challengeId, request.resource.data.inviteId)
+            && getAfter(/databases/$(database)/documents/challenges/$(challengeId)).data.ownerId != request.auth.uid
+          )
+        );
+        allow update, delete: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow get: if isMember(challengeId);
+        allow list: if false;
+        allow create: if isChallengeOwner(challengeId)
+          && isValidInvite(request.resource.data)
+          && request.resource.data.revoked == false;
+        allow update: if isChallengeOwner(challengeId)
+          && isValidInvite(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.expiresAt == resource.data.expiresAt
+          && resource.data.revoked == false
+          && request.resource.data.revoked == true;
+        allow delete: if false;
+      }
+
+      match /summaries/{summaryId} {
+        allow read: if isMember(challengeId);
+        allow create, update: if isMember(challengeId)
+          && isOwner(summaryId)
+          && isValidSummary(request.resource.data);
+        allow delete: if false;
+      }
+    }
+  }
+}

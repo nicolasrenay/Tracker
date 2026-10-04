@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.log
+.env
+.env.local
+.env.production
+playwright-report/
+test-results/
